@@ -1,5 +1,6 @@
 import type { ExtensionMessage } from '../src/messaging/types';
 import { BunkrProvider } from '../src/providers/bunkr/bunkr.provider';
+import { sanitizeFilename } from '../src/providers/bunkr/parser';
 import { defaultRegistry } from '../src/resolver/registry';
 import { logger } from '../src/utils/logger';
 
@@ -39,26 +40,39 @@ export default defineBackground(() => {
 
     if (message.type === 'DOWNLOAD_URL') {
       const { url, filename } = message;
-      chrome.downloads.download(
-        {
-          url,
-          filename: filename || undefined,
-          saveAs: false
-        },
-        (downloadId) => {
-          if (chrome.runtime.lastError) {
-            sendResponse({
-              ok: false,
-              error: chrome.runtime.lastError.message
-            });
-          } else {
-            sendResponse({
-              ok: true,
-              downloadId
-            });
+      const cleanFilename = filename ? sanitizeFilename(filename) : undefined;
+
+      const triggerDownload = (useFilename?: string) => {
+        chrome.downloads.download(
+          {
+            url,
+            filename: useFilename || undefined,
+            saveAs: false
+          },
+          (downloadId) => {
+            const err = chrome.runtime.lastError;
+            if (err) {
+              // If failed due to filename, retry automatically without explicit filename
+              if (useFilename && err.message?.toLowerCase().includes('filename')) {
+                logger.warn('Download rejected custom filename, retrying without filename override...');
+                triggerDownload(undefined);
+                return;
+              }
+              sendResponse({
+                ok: false,
+                error: err.message
+              });
+            } else {
+              sendResponse({
+                ok: true,
+                downloadId
+              });
+            }
           }
-        }
-      );
+        );
+      };
+
+      triggerDownload(cleanFilename);
       return true; // Keep channel open for async response
     }
 

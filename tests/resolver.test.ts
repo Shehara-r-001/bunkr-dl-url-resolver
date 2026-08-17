@@ -70,7 +70,7 @@ describe('BunkrProvider Integration Resolution', () => {
     try {
       const resolved = await provider.resolve(new URL('https://dl.bunkr.cr/file/test-js-cdn'));
       expect(resolved.provider).toBe('bunkr');
-      expect(resolved.filename).toBe('Sample Video Clip');
+      expect(resolved.filename).toBe('Sample Video Clip.mp4');
       expect(resolved.directUrl).toContain('token=signed-token-123');
       expect(resolved.directUrl).toContain('ex=1900000000');
     } finally {
@@ -108,7 +108,7 @@ describe('BunkrProvider Integration Resolution', () => {
     try {
       const resolved = await provider.resolve(new URL('https://dl.bunkr.cr/file/test-fallback'));
       expect(resolved.provider).toBe('bunkr');
-      expect(resolved.filename).toBe('Fallback Image Item');
+      expect(resolved.filename).toBe('Fallback Image Item.jpg');
       expect(resolved.directUrl).toContain('token=signed-fallback-token');
       expect(resolved.directUrl).toContain('https://media-fallback.bunkr.is/storage/media/fallback-image.jpg');
     } finally {
