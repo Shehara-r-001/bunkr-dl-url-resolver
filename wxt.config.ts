@@ -9,7 +9,9 @@ export default defineConfig({
     permissions: [
       'downloads',
       'storage',
-      'clipboardRead'
+      'clipboardRead',
+      'contextMenus',
+      'notifications'
     ],
     host_permissions: [
       'https://*.bunkr.cr/*',

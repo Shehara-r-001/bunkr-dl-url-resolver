@@ -1,3 +1,4 @@
+import { handleContextMenuClick, setupContextMenus } from '../src/context-menu/menu';
 import type { ExtensionMessage } from '../src/messaging/types';
 import { BunkrProvider } from '../src/providers/bunkr/bunkr.provider';
 import { sanitizeFilename } from '../src/providers/bunkr/parser';
@@ -10,6 +11,20 @@ export default defineBackground(() => {
   // Register providers
   const bunkrProvider = new BunkrProvider();
   defaultRegistry.register(bunkrProvider);
+
+  // Setup context menu actions
+  chrome.runtime.onInstalled.addListener(() => {
+    setupContextMenus();
+  });
+
+  chrome.runtime.onStartup.addListener(() => {
+    setupContextMenus();
+  });
+
+  // Context menu click listener
+  chrome.contextMenus?.onClicked.addListener((info) => {
+    handleContextMenuClick(info);
+  });
 
   // Message listener
   chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
