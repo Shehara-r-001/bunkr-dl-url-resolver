@@ -1,8 +1,11 @@
 {
   "name": "bunkr-fdm",
   "description": "Bunkr to FDM Resolver Extension",
-  "private": true,
   "version": "0.1.0",
+  "author": "Shehara-r-001",
+  "license": "MIT",
+  "homepage": "https://github.com/Shehara-r-001/bunkr-dl-url-resolver",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "wxt",
