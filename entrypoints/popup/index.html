@@ -22,74 +22,147 @@
         </nav>
       </header>
 
-      <!-- TAB 1: RESOLVER -->
+      <!-- TAB 1: RESOLVER (Single & Batch) -->
       <section id="tab-resolve" class="tab-content active">
-        <div class="input-section">
-          <label for="url-input" class="input-label">Bunkr Item URL</label>
-          <div class="input-row">
-            <input
-              type="text"
-              id="url-input"
-              placeholder="https://dl.bunkr.cr/file/... or bunkr.is/..."
-              spellcheck="false"
-              autocomplete="off"
-            />
-            <button id="paste-btn" class="icon-btn" title="Paste from clipboard" type="button">
-              📋
+        <!-- Mode Switcher (Single vs Batch) -->
+        <div class="mode-switch-container">
+          <div class="mode-pills">
+            <button id="mode-single-btn" class="mode-pill active" type="button">Single Link</button>
+            <button id="mode-batch-btn" class="mode-pill" type="button">
+              Batch URLs
+              <span class="info-tooltip-wrapper" title="Batch resolution processes up to 3 links concurrently to prevent CDN rate-limiting">
+                <span class="info-icon">ℹ️</span>
+              </span>
             </button>
           </div>
         </div>
 
-        <button id="resolve-btn" class="btn primary-btn" type="button">
-          <span class="btn-text" id="resolve-btn-text">Resolve Link</span>
-          <span class="spinner hidden" id="resolve-spinner"></span>
-        </button>
-
-        <!-- Progress status indicator during resolution -->
-        <div id="progress-bar-container" class="progress-container hidden">
-          <div class="progress-bar"></div>
-          <span id="progress-text" class="progress-text">Fetching page...</span>
-        </div>
-
-        <!-- Status / Error Notification with Diagnostics -->
-        <div id="status-box" class="status-box hidden">
-          <div class="status-header">
-            <span class="status-icon">❌</span>
-            <div class="status-message" id="status-message"></div>
-          </div>
-          <div class="status-actions">
-            <button id="retry-btn" class="btn micro-btn" type="button">🔄 Retry</button>
-            <button id="copy-diag-btn" class="btn micro-btn" type="button">📋 Copy Diagnostics</button>
-          </div>
-          <div id="diagnostics-box" class="diagnostics-box hidden">
-            <pre id="diagnostics-text"></pre>
-          </div>
-        </div>
-
-        <!-- Resolved Result Card -->
-        <div id="result-card" class="result-card hidden">
-          <div class="result-top">
-            <span class="badge success">✓ Direct Link Ready</span>
-            <span id="expiry-badge" class="badge expiry"></span>
-          </div>
-
-          <div class="file-details">
-            <div class="file-icon">📄</div>
-            <div class="file-meta">
-              <div id="file-name" class="file-name" title="Filename">Unknown</div>
-              <div id="file-provider" class="file-provider">Source: Bunkr</div>
+        <!-- 1A: Single Link View -->
+        <div id="view-single" class="resolve-view">
+          <div class="input-section">
+            <label for="url-input" class="input-label">Bunkr Item URL</label>
+            <div class="input-row">
+              <input
+                type="text"
+                id="url-input"
+                placeholder="https://dl.bunkr.cr/file/... or bunkr.is/..."
+                spellcheck="false"
+                autocomplete="off"
+              />
+              <button id="paste-btn" class="icon-btn" title="Paste from clipboard" type="button">
+                📋
+              </button>
             </div>
           </div>
 
-          <div class="action-buttons">
-            <button id="copy-btn" class="btn secondary-btn" type="button">
-              📋 Copy Link
+          <button id="resolve-btn" class="btn primary-btn" type="button">
+            <span class="btn-text" id="resolve-btn-text">Resolve Link</span>
+            <span class="spinner hidden" id="resolve-spinner"></span>
+          </button>
+
+          <!-- Progress status indicator during resolution -->
+          <div id="progress-bar-container" class="progress-container hidden">
+            <div class="progress-bar"></div>
+            <span id="progress-text" class="progress-text">Fetching page...</span>
+          </div>
+
+          <!-- Status / Error Notification with Diagnostics -->
+          <div id="status-box" class="status-box hidden">
+            <div class="status-header">
+              <span class="status-icon">❌</span>
+              <div class="status-message" id="status-message"></div>
+            </div>
+            <div class="status-actions">
+              <button id="retry-btn" class="btn micro-btn" type="button">🔄 Retry</button>
+              <button id="copy-diag-btn" class="btn micro-btn" type="button">📋 Copy Diagnostics</button>
+            </div>
+            <div id="diagnostics-box" class="diagnostics-box hidden">
+              <pre id="diagnostics-text"></pre>
+            </div>
+          </div>
+
+          <!-- Resolved Result Card -->
+          <div id="result-card" class="result-card hidden">
+            <div class="result-top">
+              <span class="badge success">✓ Direct Link Ready</span>
+              <span id="expiry-badge" class="badge expiry"></span>
+            </div>
+
+            <div class="file-details">
+              <div class="file-icon">📄</div>
+              <div class="file-meta">
+                <div id="file-name" class="file-name" title="Filename">Unknown</div>
+                <div id="file-provider" class="file-provider">Source: Bunkr</div>
+              </div>
+            </div>
+
+            <div class="action-buttons">
+              <button id="copy-btn" class="btn secondary-btn" type="button">
+                📋 Copy Link
+              </button>
+              <button id="download-btn" class="btn success-btn" type="button">
+                ⬇ Download
+              </button>
+              <button id="open-tab-btn" class="btn icon-action-btn" title="Open direct URL in new tab" type="button">
+                ↗
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1B: Batch URLs View -->
+        <div id="view-batch" class="resolve-view hidden">
+          <div class="input-section">
+            <div class="label-row">
+              <label for="batch-textarea" class="input-label">Paste Bunkr URLs (one per line)</label>
+              <span id="batch-count-badge" class="badge link-count">0 links</span>
+            </div>
+            <div class="textarea-wrapper">
+              <textarea
+                id="batch-textarea"
+                rows="4"
+                placeholder="https://dl.bunkr.cr/file/item1&#10;https://bunkr.is/v/item2&#10;https://bunkr.site/file/item3"
+                spellcheck="false"
+              ></textarea>
+              <button id="batch-paste-btn" class="icon-btn floating-paste" title="Paste from clipboard" type="button">
+                📋
+              </button>
+            </div>
+          </div>
+
+          <div class="batch-control-row">
+            <button id="batch-resolve-btn" class="btn primary-btn" type="button">
+              <span id="batch-btn-text">Resolve Batch</span>
+              <span class="spinner hidden" id="batch-spinner"></span>
             </button>
-            <button id="download-btn" class="btn success-btn" type="button">
-              ⬇ Download
+            <button id="batch-cancel-btn" class="btn danger-btn hidden" type="button">
+              Cancel
             </button>
-            <button id="open-tab-btn" class="btn icon-action-btn" title="Open direct URL in new tab" type="button">
-              ↗
+          </div>
+
+          <!-- Batch Progress Summary -->
+          <div id="batch-progress-card" class="batch-progress-card hidden">
+            <div class="progress-track">
+              <div id="batch-progress-fill" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <div class="batch-summary-text">
+              <span id="batch-summary-stats">0 / 0 completed</span>
+              <span id="batch-summary-errors" class="error-count hidden">0 failed</span>
+            </div>
+          </div>
+
+          <!-- Batch Items List -->
+          <div id="batch-items-list" class="batch-items-list hidden">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Batch Action Buttons -->
+          <div id="batch-actions-bar" class="batch-actions-bar hidden">
+            <button id="batch-copy-all-btn" class="btn secondary-btn" type="button">
+              📋 Copy All URLs
+            </button>
+            <button id="batch-download-all-btn" class="btn success-btn" type="button">
+              ⬇ Download All (FDM)
             </button>
           </div>
         </div>

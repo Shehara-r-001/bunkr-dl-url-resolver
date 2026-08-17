@@ -1,3 +1,5 @@
+import { BatchQueue, parseBatchUrls } from '../../src/batch/queue';
+import type { BatchItem, BatchSummary } from '../../src/batch/types';
 import { requestDownload, requestUrlResolution } from '../../src/messaging/messages';
 import { isBunkrHost } from '../../src/providers/bunkr/urls';
 import { addHistoryItem, clearHistory, getHistory, type HistoryItem } from '../../src/storage/history';
@@ -12,7 +14,13 @@ const tabContents = {
   settings: document.getElementById('tab-settings') as HTMLElement
 };
 
-// UI Elements - Resolver
+// UI Elements - Mode Switcher
+const modeSingleBtn = document.getElementById('mode-single-btn') as HTMLButtonElement;
+const modeBatchBtn = document.getElementById('mode-batch-btn') as HTMLButtonElement;
+const viewSingle = document.getElementById('view-single') as HTMLElement;
+const viewBatch = document.getElementById('view-batch') as HTMLElement;
+
+// UI Elements - Single Resolver
 const urlInput = document.getElementById('url-input') as HTMLInputElement;
 const pasteBtn = document.getElementById('paste-btn') as HTMLButtonElement;
 const resolveBtn = document.getElementById('resolve-btn') as HTMLButtonElement;
@@ -33,6 +41,23 @@ const copyBtn = document.getElementById('copy-btn') as HTMLButtonElement;
 const downloadBtn = document.getElementById('download-btn') as HTMLButtonElement;
 const openTabBtn = document.getElementById('open-tab-btn') as HTMLButtonElement;
 
+// UI Elements - Batch Resolver
+const batchTextarea = document.getElementById('batch-textarea') as HTMLTextAreaElement;
+const batchCountBadge = document.getElementById('batch-count-badge') as HTMLElement;
+const batchPasteBtn = document.getElementById('batch-paste-btn') as HTMLButtonElement;
+const batchResolveBtn = document.getElementById('batch-resolve-btn') as HTMLButtonElement;
+const batchCancelBtn = document.getElementById('batch-cancel-btn') as HTMLButtonElement;
+const batchBtnText = document.getElementById('batch-btn-text') as HTMLElement;
+const batchSpinner = document.getElementById('batch-spinner') as HTMLElement;
+const batchProgressCard = document.getElementById('batch-progress-card') as HTMLElement;
+const batchProgressFill = document.getElementById('batch-progress-fill') as HTMLElement;
+const batchSummaryStats = document.getElementById('batch-summary-stats') as HTMLElement;
+const batchSummaryErrors = document.getElementById('batch-summary-errors') as HTMLElement;
+const batchItemsList = document.getElementById('batch-items-list') as HTMLElement;
+const batchActionsBar = document.getElementById('batch-actions-bar') as HTMLElement;
+const batchCopyAllBtn = document.getElementById('batch-copy-all-btn') as HTMLButtonElement;
+const batchDownloadAllBtn = document.getElementById('batch-download-all-btn') as HTMLButtonElement;
+
 // UI Elements - History
 const historyList = document.getElementById('history-list') as HTMLElement;
 const historyEmpty = document.getElementById('history-empty') as HTMLElement;
@@ -49,6 +74,7 @@ const toast = document.getElementById('toast') as HTMLElement;
 let currentResolved: ResolvedDownload | null = null;
 let lastErrorDiagnostics: unknown = null;
 let activeSettings: UserSettings;
+let activeBatchQueue: BatchQueue | null = null;
 
 // --- Tab Navigation ---
 function switchTab(tabKey: 'resolve' | 'history' | 'settings') {
@@ -75,6 +101,17 @@ tabButtons.forEach((btn) => {
   });
 });
 
+// --- Mode Switcher (Single vs Batch) ---
+function switchResolveMode(mode: 'single' | 'batch') {
+  modeSingleBtn.classList.toggle('active', mode === 'single');
+  modeBatchBtn.classList.toggle('active', mode === 'batch');
+  viewSingle.classList.toggle('hidden', mode !== 'single');
+  viewBatch.classList.toggle('hidden', mode !== 'batch');
+}
+
+modeSingleBtn?.addEventListener('click', () => switchResolveMode('single'));
+modeBatchBtn?.addEventListener('click', () => switchResolveMode('batch'));
+
 // --- Toast Helper ---
 function showToast(msg: string) {
   if (!toast) return;
@@ -85,7 +122,7 @@ function showToast(msg: string) {
   }, 2000);
 }
 
-// --- Helpers & UI States ---
+// --- Helpers & UI States (Single) ---
 function showLoading(isLoading: boolean, stage: string = 'Resolving...') {
   if (isLoading) {
     resolveBtn.disabled = true;
@@ -205,6 +242,7 @@ async function renderHistory() {
     reResolveBtn.addEventListener('click', () => {
       urlInput.value = item.sourceUrl;
       switchTab('resolve');
+      switchResolveMode('single');
       handleResolve();
     });
 
@@ -220,7 +258,7 @@ clearHistoryBtn?.addEventListener('click', async () => {
   showToast('History cleared');
 });
 
-// --- Resolution Handler ---
+// --- Resolution Handler (Single) ---
 async function handleResolve() {
   const url = urlInput.value.trim();
   if (!url) {
@@ -274,13 +312,26 @@ async function handleResolve() {
   }
 }
 
-// Paste Handler
+// Paste Handlers
 pasteBtn?.addEventListener('click', async () => {
   try {
     const text = await navigator.clipboard.readText();
     if (text) {
       urlInput.value = text.trim();
       urlInput.focus();
+    }
+  } catch (err) {
+    console.error('Failed to read clipboard', err);
+  }
+});
+
+batchPasteBtn?.addEventListener('click', async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) {
+      batchTextarea.value = text.trim();
+      updateBatchCount();
+      batchTextarea.focus();
     }
   } catch (err) {
     console.error('Failed to read clipboard', err);
@@ -364,6 +415,170 @@ openTabBtn?.addEventListener('click', () => {
   }
 });
 
+// --- Batch Resolution Logic ---
+function updateBatchCount() {
+  const urls = parseBatchUrls(batchTextarea.value);
+  batchCountBadge.textContent = `${urls.length} link${urls.length === 1 ? '' : 's'}`;
+}
+
+batchTextarea?.addEventListener('input', updateBatchCount);
+
+function renderBatchItems(items: BatchItem[]) {
+  batchItemsList.innerHTML = '';
+  items.forEach((item) => {
+    const card = document.createElement('div');
+    card.className = 'batch-item-card';
+
+    const info = document.createElement('div');
+    info.className = 'batch-item-info';
+
+    const title = document.createElement('div');
+    title.className = 'batch-item-title';
+    title.textContent = item.result?.filename || item.sourceUrl.split('/').pop() || 'file';
+    title.title = item.sourceUrl;
+
+    const urlEl = document.createElement('div');
+    urlEl.className = 'batch-item-url';
+    urlEl.textContent = item.error ? item.error : item.sourceUrl;
+
+    info.appendChild(title);
+    info.appendChild(urlEl);
+
+    const statusPill = document.createElement('span');
+    statusPill.className = `batch-item-status ${item.state}`;
+    statusPill.textContent =
+      item.state === 'resolved' ? '✓ Ready' :
+      item.state === 'resolving' ? 'Resolving...' :
+      item.state === 'failed' ? 'Failed' : 'Queued';
+
+    card.appendChild(info);
+    card.appendChild(statusPill);
+    batchItemsList.appendChild(card);
+  });
+}
+
+function updateBatchProgress(summary: BatchSummary) {
+  const percent = summary.total > 0 ? Math.round((summary.completed / summary.total) * 100) : 0;
+  batchProgressFill.style.width = `${percent}%`;
+  batchSummaryStats.textContent = `${summary.completed} / ${summary.total} completed (${summary.resolved} ready)`;
+
+  if (summary.failed > 0) {
+    batchSummaryErrors.textContent = `${summary.failed} failed`;
+    batchSummaryErrors.classList.remove('hidden');
+  } else {
+    batchSummaryErrors.classList.add('hidden');
+  }
+}
+
+async function handleBatchResolve() {
+  const urls = parseBatchUrls(batchTextarea.value);
+  if (urls.length === 0) {
+    showToast('Please enter at least one valid Bunkr URL');
+    return;
+  }
+
+  batchResolveBtn.disabled = true;
+  batchSpinner.classList.remove('hidden');
+  batchBtnText.textContent = 'Resolving Batch...';
+  batchCancelBtn.classList.remove('hidden');
+  batchProgressCard.classList.remove('hidden');
+  batchItemsList.classList.remove('hidden');
+  batchActionsBar.classList.add('hidden');
+
+  activeBatchQueue = new BatchQueue(urls, {
+    concurrency: 3,
+    onItemUpdate: (_item, summary) => {
+      updateBatchProgress(summary);
+      if (activeBatchQueue) {
+        renderBatchItems(activeBatchQueue.getItems());
+      }
+    },
+    onComplete: (summary) => {
+      batchResolveBtn.disabled = false;
+      batchSpinner.classList.add('hidden');
+      batchBtnText.textContent = 'Resolve Batch';
+      batchCancelBtn.classList.add('hidden');
+      updateBatchProgress(summary);
+
+      if (summary.resolved > 0) {
+        batchActionsBar.classList.remove('hidden');
+        showToast(`✓ Resolved ${summary.resolved} direct URLs!`);
+      }
+    }
+  });
+
+  renderBatchItems(activeBatchQueue.getItems());
+  await activeBatchQueue.start();
+}
+
+batchResolveBtn?.addEventListener('click', handleBatchResolve);
+
+batchCancelBtn?.addEventListener('click', () => {
+  if (activeBatchQueue) {
+    activeBatchQueue.cancel();
+    batchResolveBtn.disabled = false;
+    batchSpinner.classList.add('hidden');
+    batchBtnText.textContent = 'Resolve Batch';
+    batchCancelBtn.classList.add('hidden');
+    showToast('Batch cancelled');
+  }
+});
+
+// Batch Actions: Copy All Direct URLs
+batchCopyAllBtn?.addEventListener('click', async () => {
+  if (!activeBatchQueue) return;
+  const directUrls = activeBatchQueue
+    .getItems()
+    .filter((i) => i.state === 'resolved' && i.result?.directUrl)
+    .map((i) => i.result!.directUrl)
+    .join('\n');
+
+  if (!directUrls) {
+    showToast('No resolved URLs to copy');
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(directUrls);
+    showToast('✓ Copied all direct URLs to clipboard!');
+  } catch {
+    showToast('Failed to copy to clipboard');
+  }
+});
+
+// Batch Actions: Download All to FDM (with 300ms staggering)
+batchDownloadAllBtn?.addEventListener('click', async () => {
+  if (!activeBatchQueue) return;
+  const resolvedItems = activeBatchQueue
+    .getItems()
+    .filter((i) => i.state === 'resolved' && i.result?.directUrl);
+
+  if (resolvedItems.length === 0) {
+    showToast('No resolved downloads available');
+    return;
+  }
+
+  batchDownloadAllBtn.disabled = true;
+  batchDownloadAllBtn.textContent = 'Sending downloads...';
+
+  let sentCount = 0;
+  for (const item of resolvedItems) {
+    if (item.result?.directUrl) {
+      await requestDownload(item.result.directUrl, item.result.filename);
+      sentCount++;
+      // Stagger downloads to ensure FDM intercepts each call cleanly
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  }
+
+  batchDownloadAllBtn.textContent = `✓ Sent ${sentCount} to FDM`;
+  showToast(`Sent ${sentCount} downloads to FDM!`);
+  setTimeout(() => {
+    batchDownloadAllBtn.disabled = false;
+    batchDownloadAllBtn.textContent = '⬇ Download All (FDM)';
+  }, 2500);
+});
+
 // --- Settings Initializer & Listeners ---
 async function initSettings() {
   activeSettings = await loadSettings();
@@ -410,6 +625,7 @@ async function initSettings() {
   if (incomingUrl) {
     urlInput.value = incomingUrl;
     switchTab('resolve');
+    switchResolveMode('single');
     // Trigger immediate resolution
     handleResolve().then(() => {
       if (shouldAutoCopy && currentResolved?.directUrl) {
