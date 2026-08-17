@@ -389,6 +389,38 @@ async function initSettings() {
     activeSettings = await saveSettings({ autoDownloadOnResolve: settingAutoDownload.checked });
   });
 
+  // Check for incoming target URL from query parameters or background context menu
+  const params = new URLSearchParams(window.location.search);
+  let incomingUrl = params.get('url');
+  let shouldAutoCopy = params.get('autocopy') === 'true';
+
+  if (!incomingUrl && typeof chrome !== 'undefined' && chrome.storage) {
+    const storageArea = chrome.storage.session || chrome.storage.local;
+    const sessionData = await new Promise<{ pending_resolve_url?: string; auto_copy?: boolean }>((resolve) => {
+      storageArea.get(['pending_resolve_url', 'auto_copy'], (res) => resolve(res || {}));
+    });
+
+    if (sessionData.pending_resolve_url) {
+      incomingUrl = sessionData.pending_resolve_url;
+      shouldAutoCopy = sessionData.auto_copy ?? true;
+      storageArea.remove(['pending_resolve_url', 'auto_copy']);
+    }
+  }
+
+  if (incomingUrl) {
+    urlInput.value = incomingUrl;
+    switchTab('resolve');
+    // Trigger immediate resolution
+    handleResolve().then(() => {
+      if (shouldAutoCopy && currentResolved?.directUrl) {
+        navigator.clipboard.writeText(currentResolved.directUrl).then(() => {
+          showToast('✓ Resolved & copied to clipboard!');
+        }).catch(() => {});
+      }
+    });
+    return;
+  }
+
   // Auto-paste on popup open if setting is on
   if (activeSettings.autoPasteOnOpen) {
     try {

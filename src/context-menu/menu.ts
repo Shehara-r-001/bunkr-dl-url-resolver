@@ -5,7 +5,7 @@ import { addHistoryItem } from '../storage/history';
 import { logger } from '../utils/logger';
 
 export const MENU_ID_DOWNLOAD = 'bunkr-fdm-download';
-export const MENU_ID_COPY = 'bunkr-fdm-copy';
+export const MENU_ID_RESOLVE_POPUP = 'bunkr-fdm-resolve-popup';
 
 /**
  * Creates context menu items when the extension is installed or updated.
@@ -14,17 +14,17 @@ export function setupContextMenus(): void {
   if (typeof chrome === 'undefined' || !chrome.contextMenus) return;
 
   chrome.contextMenus.removeAll(() => {
-    // 1. Download with FDM
+    // 1. Download with FDM (direct background action)
     chrome.contextMenus.create({
       id: MENU_ID_DOWNLOAD,
       title: '⬇ Download with FDM',
       contexts: ['link', 'selection']
     });
 
-    // 2. Copy Direct URL
+    // 2. Resolve in Extension & Copy (opens extension popup)
     chrome.contextMenus.create({
-      id: MENU_ID_COPY,
-      title: '📋 Resolve & Copy Direct URL',
+      id: MENU_ID_RESOLVE_POPUP,
+      title: '⚡ Resolve in Extension & Copy URL',
       contexts: ['link', 'selection']
     });
 
@@ -54,7 +54,45 @@ export function extractUrlFromMenuClick(
 }
 
 /**
- * Displays a lightweight desktop notification to inform the user of resolution status.
+ * Opens the extension popup with the target URL pre-loaded and set to auto-resolve/copy.
+ */
+export async function openExtensionWithUrl(url: string, autoCopy = true): Promise<void> {
+  const popupUrl = chrome.runtime.getURL(`popup.html?url=${encodeURIComponent(url)}&autocopy=${autoCopy}`);
+
+  // Set pending state in session/local storage
+  if (typeof chrome !== 'undefined' && chrome.storage) {
+    const storageArea = chrome.storage.session || chrome.storage.local;
+    await new Promise<void>((resolve) => {
+      storageArea.set({ pending_resolve_url: url, auto_copy: autoCopy }, () => resolve());
+    });
+  }
+
+  // Try opening popup via modern API
+  if (typeof chrome !== 'undefined' && chrome.action?.openPopup) {
+    try {
+      await chrome.action.openPopup();
+      return;
+    } catch {
+      // Fallback below
+    }
+  }
+
+  // Fallback: Open in dedicated compact popup window
+  if (typeof chrome !== 'undefined' && chrome.windows?.create) {
+    chrome.windows.create({
+      url: popupUrl,
+      type: 'popup',
+      width: 400,
+      height: 480,
+      focused: true
+    });
+  } else if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
+    chrome.tabs.create({ url: popupUrl });
+  }
+}
+
+/**
+ * Displays a desktop notification.
  */
 function showNotification(title: string, message: string): void {
   if (typeof chrome !== 'undefined' && chrome.notifications) {
@@ -80,33 +118,39 @@ export async function handleContextMenuClick(
     return;
   }
 
-  showNotification('Bunkr → FDM', 'Resolving Bunkr link...');
+  // If user selected "Resolve in Extension & Copy URL", open popup directly!
+  if (info.menuItemId === MENU_ID_RESOLVE_POPUP) {
+    await openExtensionWithUrl(targetUrl, true);
+    return;
+  }
 
-  try {
-    const result = await defaultRegistry.resolve(targetUrl);
+  // Otherwise, handle "Download with FDM" in background
+  if (info.menuItemId === MENU_ID_DOWNLOAD) {
+    showNotification('Bunkr → FDM', 'Resolving Bunkr link for FDM...');
 
-    if (!result.ok) {
-      showNotification('Resolution Failed', result.error.message);
+    try {
+      const result = await defaultRegistry.resolve(targetUrl);
+
+      if (!result.ok) {
+        showNotification('Resolution Failed', result.error.message);
+        await addHistoryItem({
+          sourceUrl: targetUrl,
+          filename: 'Failed Resolution',
+          status: 'error',
+          errorMessage: result.error.message
+        });
+        return;
+      }
+
+      const { directUrl, filename } = result.value;
+
+      // Record success to history if enabled
       await addHistoryItem({
         sourceUrl: targetUrl,
-        filename: 'Failed Resolution',
-        status: 'error',
-        errorMessage: result.error.message
+        filename: filename || 'downloaded_file',
+        status: 'success'
       });
-      return;
-    }
 
-    const { directUrl, filename } = result.value;
-
-    // Record success to history if enabled
-    await addHistoryItem({
-      sourceUrl: targetUrl,
-      filename: filename || 'downloaded_file',
-      status: 'success'
-    });
-
-    if (info.menuItemId === MENU_ID_DOWNLOAD) {
-      // Trigger download
       const cleanFilename = filename ? sanitizeFilename(filename) : undefined;
       chrome.downloads.download(
         {
@@ -114,10 +158,10 @@ export async function handleContextMenuClick(
           filename: cleanFilename,
           saveAs: false
         },
-        (downloadId) => {
+        () => {
           if (chrome.runtime.lastError) {
             // Retry without filename if browser rejected name
-            chrome.downloads.download({ url: directUrl, saveAs: false }, (retryId) => {
+            chrome.downloads.download({ url: directUrl, saveAs: false }, () => {
               if (chrome.runtime.lastError) {
                 showNotification('Download Failed', chrome.runtime.lastError.message || 'Error');
               } else {
@@ -129,11 +173,8 @@ export async function handleContextMenuClick(
           }
         }
       );
-    } else if (info.menuItemId === MENU_ID_COPY) {
-      // Direct URL notification with truncated display
-      showNotification('Direct Link Ready', `Resolved: ${filename || directUrl.slice(0, 45)}...`);
+    } catch (err) {
+      showNotification('Error', (err as Error)?.message || 'Failed to resolve link');
     }
-  } catch (err) {
-    showNotification('Error', (err as Error)?.message || 'Failed to resolve link');
   }
 }
