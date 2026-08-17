@@ -9,15 +9,21 @@
   </head>
   <body>
     <div id="app" class="popup-container">
+      <!-- Header -->
       <header class="header">
         <div class="logo-title">
           <img src="/icon/32.png" alt="Icon" class="logo-img" width="22" height="22" />
           <h1>Bunkr → FDM</h1>
         </div>
-        <span class="badge version">v0.1.0</span>
+        <nav class="tabs-nav" aria-label="Tabs">
+          <button class="tab-btn active" data-tab="resolve" title="Resolve Links">⚡</button>
+          <button class="tab-btn" data-tab="history" title="History">🕒</button>
+          <button class="tab-btn" data-tab="settings" title="Settings">⚙</button>
+        </nav>
       </header>
 
-      <main class="main-content">
+      <!-- TAB 1: RESOLVER -->
+      <section id="tab-resolve" class="tab-content active">
         <div class="input-section">
           <label for="url-input" class="input-label">Bunkr Item URL</label>
           <div class="input-row">
@@ -35,13 +41,26 @@
         </div>
 
         <button id="resolve-btn" class="btn primary-btn" type="button">
-          <span class="btn-text">Resolve Link</span>
+          <span class="btn-text" id="resolve-btn-text">Resolve Link</span>
           <span class="spinner hidden" id="resolve-spinner"></span>
         </button>
 
-        <!-- Status / Error Notification -->
+        <!-- Progress status indicator during resolution -->
+        <div id="progress-bar-container" class="progress-container hidden">
+          <div class="progress-bar"></div>
+          <span id="progress-text" class="progress-text">Fetching page...</span>
+        </div>
+
+        <!-- Status / Error Notification with Diagnostics -->
         <div id="status-box" class="status-box hidden">
-          <div class="status-message" id="status-message"></div>
+          <div class="status-header">
+            <span class="status-icon">❌</span>
+            <div class="status-message" id="status-message"></div>
+          </div>
+          <div class="status-actions">
+            <button id="retry-btn" class="btn micro-btn" type="button">🔄 Retry</button>
+            <button id="copy-diag-btn" class="btn micro-btn" type="button">📋 Copy Diagnostics</button>
+          </div>
           <div id="diagnostics-box" class="diagnostics-box hidden">
             <pre id="diagnostics-text"></pre>
           </div>
@@ -64,15 +83,100 @@
 
           <div class="action-buttons">
             <button id="copy-btn" class="btn secondary-btn" type="button">
-              📋 Copy Direct URL
+              📋 Copy Link
             </button>
             <button id="download-btn" class="btn success-btn" type="button">
               ⬇ Download
             </button>
+            <button id="open-tab-btn" class="btn icon-action-btn" title="Open direct URL in new tab" type="button">
+              ↗
+            </button>
           </div>
         </div>
-      </main>
+      </section>
 
+      <!-- TAB 2: HISTORY -->
+      <section id="tab-history" class="tab-content hidden">
+        <div class="section-header">
+          <h2>Recent Resolutions</h2>
+          <button id="clear-history-btn" class="btn danger-link" type="button">Clear</button>
+        </div>
+        <div id="history-disabled-banner" class="info-banner hidden">
+          <span>ℹ️ History saving is disabled in Settings.</span>
+        </div>
+        <div id="history-list" class="history-list">
+          <!-- Dynamically populated -->
+        </div>
+        <div id="history-empty" class="empty-state hidden">
+          <span>No recent links</span>
+        </div>
+      </section>
+
+      <!-- TAB 3: SETTINGS -->
+      <section id="tab-settings" class="tab-content hidden">
+        <div class="section-header">
+          <h2>Extension Settings</h2>
+        </div>
+
+        <div class="settings-group">
+          <!-- Save History Toggle -->
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-title">Save Resolution History</span>
+              <span class="setting-desc">Store up to 8 recent non-sensitive links locally</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="setting-save-history" />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- Auto-Paste Toggle -->
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-title">Auto-paste on open</span>
+              <span class="setting-desc">Paste valid Bunkr link from clipboard automatically</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="setting-auto-paste" />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- Auto-Copy Toggle -->
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-title">Auto-copy direct URL</span>
+              <span class="setting-desc">Copy signed URL to clipboard upon resolution</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="setting-auto-copy" />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- Auto-Download Toggle -->
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-title">Auto-download on resolve</span>
+              <span class="setting-desc">Trigger download immediately once resolved</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="setting-auto-download" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-footer">
+          <span>Preferences saved automatically</span>
+        </div>
+      </section>
+
+      <!-- Global Toast Container -->
+      <div id="toast" class="toast hidden"></div>
+
+      <!-- Footer -->
       <footer class="footer">
         <span>FDM will intercept browser downloads if installed</span>
       </footer>
