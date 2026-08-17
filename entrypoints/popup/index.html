@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bunkr → FDM Resolver</title>
+    <link rel="icon" type="image/png" href="/icon/32.png" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="app" class="popup-container">
+      <header class="header">
+        <div class="logo-title">
+          <img src="/icon/32.png" alt="Icon" class="logo-img" width="22" height="22" />
+          <h1>Bunkr → FDM</h1>
+        </div>
+        <span class="badge version">v0.1.0</span>
+      </header>
+
+      <main class="main-content">
+        <div class="input-section">
+          <label for="url-input" class="input-label">Bunkr Item URL</label>
+          <div class="input-row">
+            <input
+              type="text"
+              id="url-input"
+              placeholder="https://dl.bunkr.cr/file/... or bunkr.is/..."
+              spellcheck="false"
+              autocomplete="off"
+            />
+            <button id="paste-btn" class="icon-btn" title="Paste from clipboard" type="button">
+              📋
+            </button>
+          </div>
+        </div>
+
+        <button id="resolve-btn" class="btn primary-btn" type="button">
+          <span class="btn-text">Resolve Link</span>
+          <span class="spinner hidden" id="resolve-spinner"></span>
+        </button>
+
+        <!-- Status / Error Notification -->
+        <div id="status-box" class="status-box hidden">
+          <div class="status-message" id="status-message"></div>
+          <div id="diagnostics-box" class="diagnostics-box hidden">
+            <pre id="diagnostics-text"></pre>
+          </div>
+        </div>
+
+        <!-- Resolved Result Card -->
+        <div id="result-card" class="result-card hidden">
+          <div class="result-top">
+            <span class="badge success">✓ Direct Link Ready</span>
+            <span id="expiry-badge" class="badge expiry"></span>
+          </div>
+
+          <div class="file-details">
+            <div class="file-icon">📄</div>
+            <div class="file-meta">
+              <div id="file-name" class="file-name" title="Filename">Unknown</div>
+              <div id="file-provider" class="file-provider">Source: Bunkr</div>
+            </div>
+          </div>
+
+          <div class="action-buttons">
+            <button id="copy-btn" class="btn secondary-btn" type="button">
+              📋 Copy Direct URL
+            </button>
+            <button id="download-btn" class="btn success-btn" type="button">
+              ⬇ Download
+            </button>
+          </div>
+        </div>
+      </main>
+
+      <footer class="footer">
+        <span>FDM will intercept browser downloads if installed</span>
+      </footer>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

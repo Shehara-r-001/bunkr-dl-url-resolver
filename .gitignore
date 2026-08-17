@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Output directories
+.output/
+.wxt/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Planning & Scratch documents
+*plan*.md
+bunkr-fdm-extension-plan.md
+
+# OS files
+.DS_Store
+Thumbs.db
